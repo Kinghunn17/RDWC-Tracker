@@ -33,7 +33,6 @@
   .brand .sub{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.04em;
     text-transform:uppercase}
   .opname{font-family:var(--mono);font-size:12px;color:var(--teal);margin-top:2px}
-  .sync-indicator{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
 
   nav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;background:var(--panel);
     border-top:1px solid var(--hair)}
@@ -153,7 +152,6 @@
 <header>
   <div class="brand"><span class="dot"></span><h1>RDWC&nbsp;Operations&nbsp;Control</h1></div>
   <div class="opname" id="opName">Perpetual Harvest · Springfield, MO</div>
-  <div class="sync-indicator" id="syncStatus">Connecting...</div>
 </header>
 
 <main>
@@ -291,24 +289,8 @@
   <button data-v="log" onclick="go('log')"><span class="ic">≣</span>Log</button>
 </nav>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyA-w6b3qsge1bnEAJ68y4i-q4DF1ZxV3h4",
-  authDomain: "rdwc-project.firebaseapp.com",
-  projectId: "rdwc-project",
-  storageBucket: "rdwc-project.firebasestorage.app",
-  messagingSenderId: "568485855471",
-  appId: "1:568485855471:web:b9dfa42019af8c1c1e9b1a"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
+<script>
 let profile = {}, plants = [], logs = [];
-let syncReady = false;
 
 const PROFILE_DEFAULTS = {
   op: "", loc: "Springfield, MO", tent: "", water: "Springfield municipal (chloramine)",
@@ -379,55 +361,41 @@ function updateOpName() {
   document.getElementById('opName').textContent = (n ? n : 'Perpetual Harvest') + (loc ? ' · ' + loc : '');
 }
 
-async function saveProfile() {
+function saveProfile() {
   PFIELDS.forEach(f => profile[f] = document.getElementById('p_' + f).value.trim());
-  try {
-    await setDoc(doc(db, 'rdwc', 'profile'), profile);
-    updateOpName();
-    const s = document.getElementById('profSaved');
-    s.classList.add('show');
-    setTimeout(() => s.classList.remove('show'), 1600);
-    toast('Profile saved');
-  } catch (e) {
-    console.error('Profile save failed:', e);
-    toast('Save failed — check connection');
-  }
+  localStorage.setItem('rdwc-profile', JSON.stringify(profile));
+  updateOpName();
+  const s = document.getElementById('profSaved');
+  s.classList.add('show');
+  setTimeout(() => s.classList.remove('show'), 1600);
+  toast('Profile saved');
 }
-
-const ORDER = ['Germination', 'Seedling', 'Early Veg', 'Late Veg', 'Transition', 'Flower', 'Harvest', 'Drying', 'Curing', 'Done'];
 
 function daysBetween(a, b) {
   return Math.floor((b - a) / 86400000);
 }
 
-async function addPlant() {
+function addPlant() {
   const id = document.getElementById('pl_id').value.trim();
   if (!id) { toast('Add a plant ID'); return; }
-  const newPlant = {
+  plants.push({
     id, strain: document.getElementById('pl_strain').value.trim(),
     src: document.getElementById('pl_src').value.trim(), stage: document.getElementById('pl_stage').value,
     start: document.getElementById('pl_start').value, flip: document.getElementById('pl_flip').value,
     dur: parseInt(document.getElementById('pl_dur').value) || 63, added: Date.now()
-  };
-  try {
-    const plantRef = doc(db, 'rdwc', 'plants', 'list', id);
-    await setDoc(plantRef, newPlant);
-    ['pl_id', 'pl_strain', 'pl_src', 'pl_start', 'pl_flip'].forEach(i => document.getElementById(i).value = '');
-    toast('Plant added');
-  } catch (e) {
-    console.error('Plant add failed:', e);
-    toast('Failed to add plant');
-  }
+  });
+  localStorage.setItem('rdwc-plants', JSON.stringify(plants));
+  ['pl_id', 'pl_strain', 'pl_src', 'pl_start', 'pl_flip'].forEach(i => document.getElementById(i).value = '');
+  renderPlants();
+  renderDash();
+  toast('Plant added');
 }
 
-async function delPlant(plantId) {
-  try {
-    await deleteDoc(doc(db, 'rdwc', 'plants', 'list', plantId));
-    renderPlants();
-    renderDash();
-  } catch (e) {
-    console.error('Plant delete failed:', e);
-  }
+function delPlant(i) {
+  plants.splice(i, 1);
+  localStorage.setItem('rdwc-plants', JSON.stringify(plants));
+  renderPlants();
+  renderDash();
 }
 
 function plantProgress(p) {
@@ -446,7 +414,7 @@ function renderPlants() {
     el.innerHTML = '<div class="empty"><b>Pipeline is empty</b>Add your first plant above to start tracking it through germination → cure.</div>';
     return;
   }
-  el.innerHTML = plants.map(p => {
+  el.innerHTML = plants.map((p, i) => {
     const pr = plantProgress(p);
     let meta = `<div>Start <b>${p.start || '—'}</b></div>`;
     if (p.flip) meta += `<div>Flip <b>${p.flip}</b></div>`;
@@ -457,12 +425,12 @@ function renderPlants() {
       <span class="stage-pill">${p.stage}</span></div>
       <div class="pmeta">${meta}</div>
       ${pr ? `<div class="prog"><i style="width:${pr.pct}%"></i></div>` : ''}
-      <div style="margin-top:11px;text-align:right"><button class="btn danger" onclick="delPlant('${p.id}')">Remove</button></div>
+      <div style="margin-top:11px;text-align:right"><button class="btn danger" onclick="delPlant(${i})">Remove</button></div>
       </div>`;
   }).join('');
 }
 
-async function addLog() {
+function addLog() {
   const date = document.getElementById('lg_date').value || new Date().toISOString().slice(0, 10);
   const num = id => {
     const v = document.getElementById(id).value;
@@ -473,26 +441,20 @@ async function addLog() {
     ec: num('lg_ec'), atemp: num('lg_atemp'), rh: num('lg_rh'), root: document.getElementById('lg_root').value,
     notes: document.getElementById('lg_notes').value.trim(), ts: Date.now()
   };
-  try {
-    const logRef = doc(db, 'rdwc', 'logs', e.ts.toString());
-    await setDoc(logRef, e);
-    ['lg_wtemp', 'lg_ph', 'lg_ec', 'lg_atemp', 'lg_rh', 'lg_notes'].forEach(i => document.getElementById(i).value = '');
-    document.getElementById('lg_root').value = '';
-    toast('Reading logged');
-  } catch (e) {
-    console.error('Log add failed:', e);
-    toast('Failed to log reading');
-  }
+  logs.unshift(e);
+  localStorage.setItem('rdwc-logs', JSON.stringify(logs));
+  ['lg_wtemp', 'lg_ph', 'lg_ec', 'lg_atemp', 'lg_rh', 'lg_notes'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('lg_root').value = '';
+  renderLogs();
+  renderDash();
+  toast('Reading logged');
 }
 
-async function delLog(ts) {
-  try {
-    await deleteDoc(doc(db, 'rdwc', 'logs', ts.toString()));
-    renderLogs();
-    renderDash();
-  } catch (e) {
-    console.error('Log delete failed:', e);
-  }
+function delLog(i) {
+  logs.splice(i, 1);
+  localStorage.setItem('rdwc-logs', JSON.stringify(logs));
+  renderLogs();
+  renderDash();
 }
 
 function renderLogs() {
@@ -501,14 +463,14 @@ function renderLogs() {
     el.innerHTML = '<div class="empty"><b>No readings yet</b>Your daily numbers build the dashboard and risk register. Log today\'s reservoir + climate to begin.</div>';
     return;
   }
-  el.innerHTML = logs.slice(0, 40).map(e => {
+  el.innerHTML = logs.slice(0, 40).map((e, i) => {
     const d = new Date(e.date + 'T00:00:00');
     const md = (d.getMonth() + 1) + '/' + d.getDate();
     const vpd = calcVPD(e.atemp, e.rh);
     const cell = (lbl, v, key) => v == null ? '' : `<span class="${statusOf(v, key, e.stage)}"><b>${v}</b></span>`;
     return `<div class="logrow"><div class="ldate"><b>${md}</b>${e.stage}</div>
       <div class="lvals">${cell('H₂O', e.wtemp, 'wtemp')}${cell('pH', e.ph, 'ph')}${cell('EC', e.ec, 'ec')}${cell('Air', e.atemp, 'atemp')}${cell('RH', e.rh, 'rh')}${vpd != null ? `<span class="${statusOf(vpd, 'vpd', e.stage)}">VPD <b>${vpd.toFixed(2)}</b></span>` : ''}</div>
-      <button class="x" onclick="delLog(${e.ts})">×</button></div>`;
+      <button class="x" onclick="delLog(${i})">×</button></div>`;
   }).join('');
 }
 
@@ -637,91 +599,20 @@ function renderTrend() {
     </svg>`;
 }
 
-// Firestore listeners
-async function loadProfile() {
-  try {
-    const snap = await getDoc(doc(db, 'rdwc', 'profile'));
-    if (snap.exists()) {
-      profile = snap.data();
-    } else {
-      profile = { ...PROFILE_DEFAULTS };
-    }
-    fillProfile();
-  } catch (e) {
-    console.error('Profile load failed:', e);
-    profile = { ...PROFILE_DEFAULTS };
-    fillProfile();
-  }
-}
-
-function setupPlantListener() {
-  try {
-    const plantsCol = collection(db, 'rdwc', 'plants', 'list');
-    onSnapshot(plantsCol, snap => {
-      plants = snap.docs.map(d => d.data()).sort((a, b) => b.added - a.added);
-      renderPlants();
-      renderDash();
-    }, err => console.error('Plants listener error:', err));
-  } catch (e) {
-    console.error('Plants listener setup failed:', e);
-  }
-}
-
-function setupLogListener() {
-  try {
-    const logsCol = collection(db, 'rdwc', 'logs');
-    const q = query(logsCol, orderBy('ts', 'desc'), limit(100));
-    onSnapshot(q, snap => {
-      logs = snap.docs.map(d => ({ ...d.data(), ts: parseInt(d.id) }));
-      renderLogs();
-      renderDash();
-    }, err => console.error('Logs listener error:', err));
-  } catch (e) {
-    console.error('Logs listener setup failed:', e);
-  }
-}
-
-// Sync indicator
-function updateSyncStatus(status) {
-  const el = document.getElementById('syncStatus');
-  if (status === 'ready') {
-    el.textContent = '● Synced to Firestore';
-    el.style.color = 'var(--green)';
-    syncReady = true;
-  } else if (status === 'connecting') {
-    el.textContent = 'Connecting...';
-    el.style.color = 'var(--muted)';
-  } else {
-    el.textContent = '○ Offline mode';
-    el.style.color = 'var(--amber)';
-  }
-}
-
-// Bootstrap
-(async function init() {
-  updateSyncStatus('connecting');
+(function init() {
+  const pStr = localStorage.getItem('rdwc-profile');
+  profile = pStr ? JSON.parse(pStr) : { ...PROFILE_DEFAULTS };
+  const plStr = localStorage.getItem('rdwc-plants');
+  plants = plStr ? JSON.parse(plStr) : [];
+  const lgStr = localStorage.getItem('rdwc-logs');
+  logs = lgStr ? JSON.parse(lgStr) : [];
+  
   document.getElementById('lg_date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('pl_start').value = new Date().toISOString().slice(0, 10);
   
-  await loadProfile();
-  setupPlantListener();
-  setupLogListener();
-  
-  setTimeout(() => {
-    if (syncReady) updateSyncStatus('ready');
-    else updateSyncStatus('offline');
-    renderDash();
-  }, 1000);
+  fillProfile();
+  renderDash();
 })();
-
-// Expose to global for onclick handlers
-window.go = go;
-window.saveProfile = saveProfile;
-window.addPlant = addPlant;
-window.delPlant = delPlant;
-window.addLog = addLog;
-window.delLog = delLog;
-window.toast = toast;
 </script>
 </body>
 </html>
