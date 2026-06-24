@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>RDWC Operations Control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1518; --panel:#141E22; --raised:#1B282D; --hair:#26373D;
+    --txt:#E6EEF0; --muted:#8AA0A6; --faint:#5E747A;
+    --teal:#34D0C4; --teal-dim:#1E4A4A;
+    --green:#4ADE80; --amber:#F4B740; --red:#F2585B;
+    --green-bg:#13241B; --amber-bg:#2A2112; --red-bg:#2A1416;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --disp:'Space Grotesk',system-ui,sans-serif;
+    --body:'Inter',system-ui,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:var(--bg);color:var(--txt);font-family:var(--body);font-size:15px;line-height:1.45;
+    padding-bottom:84px;min-height:100vh}
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+  header{position:sticky;top:0;z-index:20;background:rgba(14,21,24,.92);backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--hair);padding:14px 18px 12px}
+  .brand{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .brand h1{font-family:var(--disp);font-size:18px;font-weight:700;letter-spacing:-.01em}
+  .brand .dot{width:8px;height:8px;border-radius:50%;background:var(--teal);
+    box-shadow:0 0 10px var(--teal);align-self:center}
+  .brand .sub{font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.04em;
+    text-transform:uppercase}
+  .opname{font-family:var(--mono);font-size:12px;color:var(--teal);margin-top:2px}
+  .sync-indicator{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px}
+
+  nav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;background:var(--panel);
+    border-top:1px solid var(--hair)}
+  nav button{flex:1;background:none;border:none;color:var(--faint);font-family:var(--mono);
+    font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;padding:11px 4px 13px;
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px;transition:color .15s}
+  nav button .ic{font-size:17px;line-height:1}
+  nav button.active{color:var(--teal)}
+  nav button.active .ic{filter:drop-shadow(0 0 6px var(--teal))}
+
+  main{max-width:760px;margin:0 auto;padding:18px 16px 8px}
+  .view{display:none;animation:fade .25s ease}
+  .view.active{display:block}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;
+    color:var(--faint);margin:22px 0 10px;display:flex;align-items:center;gap:8px}
+  .eyebrow::before{content:"";height:1px;width:14px;background:var(--teal);opacity:.7}
+  .eyebrow:first-child{margin-top:4px}
+  .panel{background:var(--panel);border:1px solid var(--hair);border-radius:14px;padding:16px;margin-bottom:14px}
+  label{display:block;font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 5px}
+  input,select,textarea{width:100%;background:var(--raised);border:1px solid var(--hair);
+    border-radius:9px;color:var(--txt);font-family:var(--body);font-size:15px;padding:11px 12px;
+    -webkit-appearance:none;appearance:none}
+  input:focus,select,textarea:focus{outline:none;border-color:var(--teal);
+    box-shadow:0 0 0 3px rgba(52,208,196,.15)}
+  select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%238AA0A6' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
+  input[type=number]{font-family:var(--mono)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .field{margin-bottom:12px}
+  .field:last-child{margin-bottom:0}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--teal);
+    color:#062A28;border:none;border-radius:10px;font-family:var(--disp);font-weight:600;font-size:14px;
+    padding:12px 18px;cursor:pointer;transition:filter .15s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:active{filter:brightness(.95)}
+  .btn.full{width:100%}
+  .btn.ghost{background:transparent;border:1px solid var(--hair);color:var(--muted)}
+  .btn.danger{background:transparent;border:1px solid var(--red);color:var(--red);font-size:12px;padding:7px 12px}
+  .saved{font-family:var(--mono);font-size:11px;color:var(--green);opacity:0;transition:opacity .2s;margin-left:10px}
+  .saved.show{opacity:1}
+  .hint{font-size:12px;color:var(--faint);margin-top:6px;line-height:1.4}
+  .empty{text-align:center;color:var(--faint);padding:34px 16px;font-size:14px}
+  .empty b{color:var(--muted);font-family:var(--disp);display:block;margin-bottom:4px;font-size:15px}
+
+  .rail{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .readout{background:var(--panel);border:1px solid var(--hair);border-radius:12px;padding:13px 13px 11px;
+    position:relative;overflow:hidden}
+  .readout .rlabel{font-family:var(--mono);font-size:10px;letter-spacing:.05em;text-transform:uppercase;
+    color:var(--muted);display:flex;justify-content:space-between;align-items:center}
+  .readout .rval{font-family:var(--mono);font-weight:600;font-size:27px;margin:4px 0 2px;letter-spacing:-.01em}
+  .readout .rval .u{font-size:13px;color:var(--faint);font-weight:400;margin-left:3px}
+  .readout .rtarget{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .zone{height:4px;border-radius:3px;margin-top:9px;background:var(--raised);overflow:hidden;position:relative}
+  .zone i{position:absolute;top:0;bottom:0;width:34%;border-radius:3px}
+  .dotstat{width:8px;height:8px;border-radius:50%}
+  .ok{color:var(--green)} .warn{color:var(--amber)} .bad{color:var(--red)}
+  .bg-ok i{background:var(--green)} .bg-warn i{background:var(--amber)} .bg-bad i{background:var(--red)}
+  .d-ok{background:var(--green);box-shadow:0 0 8px var(--green)}
+  .d-warn{background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .d-bad{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .d-na{background:var(--faint)}
+
+  .alert{border-radius:11px;padding:12px 14px;margin-bottom:9px;border:1px solid;display:flex;gap:11px;
+    align-items:flex-start;font-size:13.5px;line-height:1.4}
+  .alert .tag{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.06em;
+    padding:3px 6px;border-radius:5px;text-transform:uppercase;flex-shrink:0;margin-top:1px}
+  .alert.r{background:var(--red-bg);border-color:#52262A;color:#FBC9CB}
+  .alert.r .tag{background:var(--red);color:#2A0E10}
+  .alert.a{background:var(--amber-bg);border-color:#4A3A16;color:#F6DDA8}
+  .alert.a .tag{background:var(--amber);color:#2A1E06}
+  .alert.g{background:var(--green-bg);border-color:#1E3A2A;color:#B6E8C6}
+  .alert.g .tag{background:var(--green);color:#0A2614}
+
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px}
+  .kpi{background:var(--raised);border:1px solid var(--hair);border-radius:11px;padding:12px 13px}
+  .kpi .v{font-family:var(--mono);font-weight:600;font-size:23px;letter-spacing:-.01em}
+  .kpi .k{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.04em;
+    color:var(--muted);margin-top:2px}
+
+  .pcard{background:var(--panel);border:1px solid var(--hair);border-radius:13px;padding:14px;margin-bottom:11px}
+  .pcard .ptop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .pcard .pid{font-family:var(--disp);font-weight:600;font-size:16px}
+  .pcard .pstrain{font-size:13px;color:var(--muted);margin-top:1px}
+  .stage-pill{font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;
+    padding:5px 9px;border-radius:7px;background:var(--teal-dim);color:var(--teal);white-space:nowrap}
+  .pmeta{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:11px;padding-top:11px;border-top:1px solid var(--hair)}
+  .pmeta div{font-family:var(--mono);font-size:11px;color:var(--muted)}
+  .pmeta div b{color:var(--txt);font-weight:600}
+  .prog{height:5px;background:var(--raised);border-radius:3px;margin-top:11px;overflow:hidden}
+  .prog i{display:block;height:100%;background:linear-gradient(90deg,var(--teal-dim),var(--teal));border-radius:3px}
+
+  .logrow{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--hair);
+    border-radius:11px;padding:11px 13px;margin-bottom:8px}
+  .logrow .ldate{font-family:var(--mono);font-size:11px;color:var(--muted);width:54px;flex-shrink:0;line-height:1.3}
+  .logrow .ldate b{display:block;color:var(--txt);font-size:13px}
+  .logrow .lvals{flex:1;display:flex;flex-wrap:wrap;gap:3px 13px;font-family:var(--mono);font-size:12px}
+  .logrow .lvals span{color:var(--muted)}
+  .logrow .lvals span b{color:var(--txt);font-weight:600}
+  .x{background:none;border:none;color:var(--faint);font-size:18px;cursor:pointer;padding:2px 4px;flex-shrink:0}
+  .x:hover{color:var(--red)}
+
+  .trend{background:var(--panel);border:1px solid var(--hair);border-radius:13px;padding:15px 14px 10px}
+  .trend h3{font-family:var(--disp);font-size:13px;font-weight:600;margin-bottom:2px}
+  .trend .ts{font-family:var(--mono);font-size:10.5px;color:var(--faint)}
+  .trend svg{display:block;width:100%;height:90px;margin-top:8px}
+  .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:var(--teal);color:#062A28;font-family:var(--disp);font-weight:600;font-size:13px;
+    padding:10px 18px;border-radius:10px;opacity:0;pointer-events:none;transition:.25s;z-index:50;white-space:nowrap}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  @media(min-width:560px){.rail{grid-template-columns:1fr 1fr 1fr}.kpis{grid-template-columns:repeat(4,1fr)}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="dot"></span><h1>RDWC&nbsp;Operations&nbsp;Control</h1></div>
+  <div class="opname" id="opName">Perpetual Harvest · Springfield, MO</div>
+  <div class="sync-indicator" id="syncStatus">Connecting...</div>
+</header>
+
+<main>
+  <section class="view active" id="v-dash">
+    <div class="eyebrow">System status</div>
+    <div id="statusBanner"></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="eyebrow">Latest readings</div>
+    <div class="rail" id="rail"></div>
+    <div class="eyebrow">Risk register</div>
+    <div id="alerts"></div>
+    <div class="eyebrow">Reservoir temp · last 10 logs</div>
+    <div class="trend" id="trendWrap"></div>
+  </section>
+
+  <section class="view" id="v-profile">
+    <div class="eyebrow">Facility</div>
+    <div class="panel">
+      <div class="field"><label>Operation name</label><input id="p_op" placeholder="e.g. Flowers Cultivation"></div>
+      <div class="grid2">
+        <div class="field"><label>Location</label><input id="p_loc"></div>
+        <div class="field"><label>Tent / room size</label><input id="p_tent" placeholder="e.g. 4x4 veg / 2x4 flower"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Water source</label><input id="p_water"></div>
+        <div class="field"><label>Water treatment</label><input id="p_treat"></div>
+      </div>
+      <div class="field"><label>Dehu / AC capacity</label><input id="p_climate" placeholder="e.g. 50pt dehu, mini-split"></div>
+    </div>
+
+    <div class="eyebrow">RDWC system</div>
+    <div class="panel">
+      <div class="grid2">
+        <div class="field"><label>Number of sites</label><input id="p_sites" type="number" inputmode="numeric" placeholder="e.g. 4"></div>
+        <div class="field"><label>Bucket volume (gal)</label><input id="p_bucket" type="number" inputmode="decimal" placeholder="e.g. 5"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Control res (gal)</label><input id="p_res" type="number" inputmode="decimal" placeholder="e.g. 13"></div>
+        <div class="field"><label>Total volume (gal)</label><input id="p_total" type="number" inputmode="decimal" placeholder="auto-estimate ok"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Chiller</label><input id="p_chiller" placeholder="model / size — or 'none'"></div>
+        <div class="field"><label>Water pump</label><input id="p_pump" placeholder="GPH"></div>
+      </div>
+      <div class="field"><label>Air pump / stones</label><input id="p_air" placeholder="LPM + stone count"></div>
+    </div>
+
+    <div class="eyebrow">Lighting</div>
+    <div class="panel">
+      <div class="grid2">
+        <div class="field"><label>Fixture</label><input id="p_light" placeholder="e.g. Bloom Plus BP3000"></div>
+        <div class="field"><label>Wattage</label><input id="p_watt" type="number" inputmode="numeric" placeholder="W"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>PPFD target</label><input id="p_ppfd" type="number" inputmode="numeric" placeholder="µmol"></div>
+        <div class="field"><label>Hang height (in)</label><input id="p_hang" type="number" inputmode="numeric"></div>
+      </div>
+    </div>
+    <button class="btn full" onclick="saveProfile()">Save profile<span class="saved" id="profSaved">Saved</span></button>
+    <p class="hint">Pre-filled with your Springfield setup (municipal water → Campden for chloramine). Everything is editable — leave a field blank if it doesn't apply yet.</p>
+  </section>
+
+  <section class="view" id="v-plants">
+    <div class="eyebrow">Add plant to pipeline</div>
+    <div class="panel">
+      <div class="grid2">
+        <div class="field"><label>Plant ID</label><input id="pl_id" placeholder="e.g. TPP-01"></div>
+        <div class="field"><label>Strain</label><input id="pl_strain" placeholder="e.g. Tyson Punch Pie"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Source / breeder</label><input id="pl_src" placeholder="seed / clone"></div>
+        <div class="field"><label>Current stage</label>
+          <select id="pl_stage">
+            <option>Germination</option><option>Seedling</option><option>Early Veg</option>
+            <option>Late Veg</option><option>Transition</option><option selected>Flower</option>
+            <option>Harvest</option><option>Drying</option><option>Curing</option><option>Done</option>
+          </select>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>Start date</label><input id="pl_start" type="date"></div>
+        <div class="field"><label>Flip date (12/12)</label><input id="pl_flip" type="date"></div>
+      </div>
+      <div class="field"><label>Flower duration (days)</label><input id="pl_dur" type="number" inputmode="numeric" value="63"></div>
+      <button class="btn full" onclick="addPlant()">Add to pipeline</button>
+    </div>
+    <div class="eyebrow">Active pipeline</div>
+    <div id="plantList"></div>
+  </section>
+
+  <section class="view" id="v-log">
+    <div class="eyebrow">Log readings</div>
+    <div class="panel">
+      <div class="grid2">
+        <div class="field"><label>Date</label><input id="lg_date" type="date"></div>
+        <div class="field"><label>Stage context</label>
+          <select id="lg_stage">
+            <option value="seedling">Seedling</option>
+            <option value="veg" selected>Vegetative</option>
+            <option value="flower">Flower</option>
+          </select>
+        </div>
+      </div>
+      <div class="eyebrow" style="margin-top:6px">Root zone</div>
+      <div class="grid2">
+        <div class="field"><label>Water temp (°F)</label><input id="lg_wtemp" type="number" inputmode="decimal" placeholder="64–68"></div>
+        <div class="field"><label>pH</label><input id="lg_ph" type="number" inputmode="decimal" placeholder="5.5–6.0"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label>EC (mS/cm)</label><input id="lg_ec" type="number" inputmode="decimal" placeholder="e.g. 1.4"></div>
+        <div class="field"><label>Root health</label>
+          <select id="lg_root"><option value="">—</option><option>White / clean</option><option>Slight tint</option><option>Brown / slimy</option></select>
+        </div>
+      </div>
+      <div class="eyebrow" style="margin-top:6px">Canopy climate</div>
+      <div class="grid2">
+        <div class="field"><label>Air temp (°F)</label><input id="lg_atemp" type="number" inputmode="decimal" placeholder="72–80"></div>
+        <div class="field"><label>RH (%)</label><input id="lg_rh" type="number" inputmode="decimal" placeholder="45–60"></div>
+      </div>
+      <div class="field"><label>Notes</label><textarea id="lg_notes" rows="2" placeholder="observations, actions taken…"></textarea></div>
+      <button class="btn full" onclick="addLog()">Save reading</button>
+      <p class="hint">VPD is calculated automatically from air temp + RH. PPM (500 scale) is derived from EC.</p>
+    </div>
+    <div class="eyebrow">Recent entries</div>
+    <div id="logList"></div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<nav>
+  <button class="active" data-v="dash" onclick="go('dash')"><span class="ic">◎</span>Dashboard</button>
+  <button data-v="profile" onclick="go('profile')"><span class="ic">⚙</span>Profile</button>
+  <button data-v="plants" onclick="go('plants')"><span class="ic">❀</span>Plants</button>
+  <button data-v="log" onclick="go('log')"><span class="ic">≣</span>Log</button>
+</nav>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA-w6b3qsge1bnEAJ68y4i-q4DF1ZxV3h4",
+  authDomain: "rdwc-project.firebaseapp.com",
+  projectId: "rdwc-project",
+  storageBucket: "rdwc-project.firebasestorage.app",
+  messagingSenderId: "568485855471",
+  appId: "1:568485855471:web:b9dfa42019af8c1c1e9b1a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+let profile = {}, plants = [], logs = [];
+let syncReady = false;
+
+const PROFILE_DEFAULTS = {
+  op: "", loc: "Springfield, MO", tent: "", water: "Springfield municipal (chloramine)",
+  treat: "Campden tablet (potassium metabisulfite)", climate: "", sites: "", bucket: "", res: "", total: "",
+  chiller: "", pump: "", air: "", light: "", watt: "", ppfd: "", hang: ""
+};
+
+const BANDS = {
+  wtemp: { ideal: [64, 68], ok: [60, 70], unit: "°F", label: "Reservoir" },
+  ph: { ideal: [5.5, 6.0], ok: [5.3, 6.3], unit: "pH", label: "pH" },
+  ec: { seedling: { ideal: [0.4, 0.8], ok: [0.3, 1.0] }, veg: { ideal: [1.0, 1.6], ok: [0.8, 1.9] }, flower: { ideal: [1.4, 2.0], ok: [1.1, 2.3] }, unit: "mS", label: "EC" },
+  atemp: { seedling: { ideal: [72, 80], ok: [68, 84] }, veg: { ideal: [72, 82], ok: [66, 86] }, flower: { ideal: [68, 80], ok: [64, 84] }, unit: "°F", label: "Air temp" },
+  rh: { seedling: { ideal: [65, 70], ok: [60, 75] }, veg: { ideal: [55, 65], ok: [50, 70] }, flower: { ideal: [40, 50], ok: [38, 55] }, unit: "%", label: "Humidity" },
+  vpd: { seedling: { ideal: [0.4, 0.8], ok: [0.3, 1.0] }, veg: { ideal: [0.8, 1.2], ok: [0.6, 1.4] }, flower: { ideal: [1.2, 1.6], ok: [1.0, 1.8] }, unit: "kPa", label: "VPD" }
+};
+
+function bandFor(key, stage) {
+  const b = BANDS[key];
+  return b.ideal ? b : b[stage] || b.veg;
+}
+
+function statusOf(v, key, stage) {
+  if (v == null || isNaN(v)) return "na";
+  const b = bandFor(key, stage);
+  if (v >= b.ideal[0] && v <= b.ideal[1]) return "ok";
+  if (v >= b.ok[0] && v <= b.ok[1]) return "warn";
+  return "bad";
+}
+
+function svp(tc) {
+  return 0.61078 * Math.exp(17.27 * tc / (tc + 237.3));
+}
+
+function calcVPD(airF, rh) {
+  if (airF == null || rh == null || isNaN(airF) || isNaN(rh)) return null;
+  const airC = (airF - 32) * 5 / 9, leafC = airC - 1.1;
+  return Math.max(0, svp(leafC) - svp(airC) * rh / 100);
+}
+
+function go(v) {
+  document.querySelectorAll('.view').forEach(s => s.classList.remove('active'));
+  document.getElementById('v-' + v).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  if (v === 'dash') renderDash(); if (v === 'plants') renderPlants(); if (v === 'log') renderLogs();
+  window.scrollTo(0, 0);
+}
+
+function toast(m) {
+  const t = document.getElementById('toast');
+  t.textContent = m;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1700);
+}
+
+const PFIELDS = ['op', 'loc', 'tent', 'water', 'treat', 'climate', 'sites', 'bucket', 'res', 'total', 'chiller', 'pump', 'air', 'light', 'watt', 'ppfd', 'hang'];
+
+function fillProfile() {
+  PFIELDS.forEach(f => {
+    const el = document.getElementById('p_' + f);
+    if (el) el.value = profile[f] ?? '';
+  });
+  updateOpName();
+}
+
+function updateOpName() {
+  const n = profile.op?.trim();
+  const loc = profile.loc?.trim() || '';
+  document.getElementById('opName').textContent = (n ? n : 'Perpetual Harvest') + (loc ? ' · ' + loc : '');
+}
+
+async function saveProfile() {
+  PFIELDS.forEach(f => profile[f] = document.getElementById('p_' + f).value.trim());
+  try {
+    await setDoc(doc(db, 'rdwc', 'profile'), profile);
+    updateOpName();
+    const s = document.getElementById('profSaved');
+    s.classList.add('show');
+    setTimeout(() => s.classList.remove('show'), 1600);
+    toast('Profile saved');
+  } catch (e) {
+    console.error('Profile save failed:', e);
+    toast('Save failed — check connection');
+  }
+}
+
+const ORDER = ['Germination', 'Seedling', 'Early Veg', 'Late Veg', 'Transition', 'Flower', 'Harvest', 'Drying', 'Curing', 'Done'];
+
+function daysBetween(a, b) {
+  return Math.floor((b - a) / 86400000);
+}
+
+async function addPlant() {
+  const id = document.getElementById('pl_id').value.trim();
+  if (!id) { toast('Add a plant ID'); return; }
+  const newPlant = {
+    id, strain: document.getElementById('pl_strain').value.trim(),
+    src: document.getElementById('pl_src').value.trim(), stage: document.getElementById('pl_stage').value,
+    start: document.getElementById('pl_start').value, flip: document.getElementById('pl_flip').value,
+    dur: parseInt(document.getElementById('pl_dur').value) || 63, added: Date.now()
+  };
+  try {
+    const plantRef = doc(db, 'rdwc', 'plants', 'list', id);
+    await setDoc(plantRef, newPlant);
+    ['pl_id', 'pl_strain', 'pl_src', 'pl_start', 'pl_flip'].forEach(i => document.getElementById(i).value = '');
+    toast('Plant added');
+  } catch (e) {
+    console.error('Plant add failed:', e);
+    toast('Failed to add plant');
+  }
+}
+
+async function delPlant(plantId) {
+  try {
+    await deleteDoc(doc(db, 'rdwc', 'plants', 'list', plantId));
+    renderPlants();
+    renderDash();
+  } catch (e) {
+    console.error('Plant delete failed:', e);
+  }
+}
+
+function plantProgress(p) {
+  if (!p.flip || p.stage === 'Done' || p.stage === 'Curing') return null;
+  const flipd = new Date(p.flip + 'T00:00:00');
+  const day = daysBetween(flipd, new Date());
+  if (day < 0) return null;
+  const pct = Math.min(100, Math.round(day / p.dur * 100));
+  const wk = Math.floor(day / 7) + 1;
+  return { day, pct, wk, harvest: new Date(flipd.getTime() + p.dur * 86400000) };
+}
+
+function renderPlants() {
+  const el = document.getElementById('plantList');
+  if (!plants.length) {
+    el.innerHTML = '<div class="empty"><b>Pipeline is empty</b>Add your first plant above to start tracking it through germination → cure.</div>';
+    return;
+  }
+  el.innerHTML = plants.map(p => {
+    const pr = plantProgress(p);
+    let meta = `<div>Start <b>${p.start || '—'}</b></div>`;
+    if (p.flip) meta += `<div>Flip <b>${p.flip}</b></div>`;
+    if (pr) meta += `<div>Flower <b>wk ${pr.wk}</b> · day ${pr.day}</div><div>Harvest ~<b>${pr.harvest.toISOString().slice(0, 10)}</b></div>`;
+    if (p.src) meta += `<div>Source <b>${p.src}</b></div>`;
+    return `<div class="pcard"><div class="ptop"><div>
+      <div class="pid">${p.id}</div><div class="pstrain">${p.strain || 'Unnamed strain'}</div></div>
+      <span class="stage-pill">${p.stage}</span></div>
+      <div class="pmeta">${meta}</div>
+      ${pr ? `<div class="prog"><i style="width:${pr.pct}%"></i></div>` : ''}
+      <div style="margin-top:11px;text-align:right"><button class="btn danger" onclick="delPlant('${p.id}')">Remove</button></div>
+      </div>`;
+  }).join('');
+}
+
+async function addLog() {
+  const date = document.getElementById('lg_date').value || new Date().toISOString().slice(0, 10);
+  const num = id => {
+    const v = document.getElementById(id).value;
+    return v === '' ? null : parseFloat(v);
+  };
+  const e = {
+    date, stage: document.getElementById('lg_stage').value, wtemp: num('lg_wtemp'), ph: num('lg_ph'),
+    ec: num('lg_ec'), atemp: num('lg_atemp'), rh: num('lg_rh'), root: document.getElementById('lg_root').value,
+    notes: document.getElementById('lg_notes').value.trim(), ts: Date.now()
+  };
+  try {
+    const logRef = doc(db, 'rdwc', 'logs', e.ts.toString());
+    await setDoc(logRef, e);
+    ['lg_wtemp', 'lg_ph', 'lg_ec', 'lg_atemp', 'lg_rh', 'lg_notes'].forEach(i => document.getElementById(i).value = '');
+    document.getElementById('lg_root').value = '';
+    toast('Reading logged');
+  } catch (e) {
+    console.error('Log add failed:', e);
+    toast('Failed to log reading');
+  }
+}
+
+async function delLog(ts) {
+  try {
+    await deleteDoc(doc(db, 'rdwc', 'logs', ts.toString()));
+    renderLogs();
+    renderDash();
+  } catch (e) {
+    console.error('Log delete failed:', e);
+  }
+}
+
+function renderLogs() {
+  const el = document.getElementById('logList');
+  if (!logs.length) {
+    el.innerHTML = '<div class="empty"><b>No readings yet</b>Your daily numbers build the dashboard and risk register. Log today\'s reservoir + climate to begin.</div>';
+    return;
+  }
+  el.innerHTML = logs.slice(0, 40).map(e => {
+    const d = new Date(e.date + 'T00:00:00');
+    const md = (d.getMonth() + 1) + '/' + d.getDate();
+    const vpd = calcVPD(e.atemp, e.rh);
+    const cell = (lbl, v, key) => v == null ? '' : `<span class="${statusOf(v, key, e.stage)}"><b>${v}</b></span>`;
+    return `<div class="logrow"><div class="ldate"><b>${md}</b>${e.stage}</div>
+      <div class="lvals">${cell('H₂O', e.wtemp, 'wtemp')}${cell('pH', e.ph, 'ph')}${cell('EC', e.ec, 'ec')}${cell('Air', e.atemp, 'atemp')}${cell('RH', e.rh, 'rh')}${vpd != null ? `<span class="${statusOf(vpd, 'vpd', e.stage)}">VPD <b>${vpd.toFixed(2)}</b></span>` : ''}</div>
+      <button class="x" onclick="delLog(${e.ts})">×</button></div>`;
+  }).join('');
+}
+
+function renderDash() {
+  const latest = logs[0];
+  const banner = document.getElementById('statusBanner');
+  if (!latest) {
+    banner.innerHTML = '';
+  } else {
+    const since = daysBetween(new Date(latest.date + 'T00:00:00'), new Date());
+    const stale = since > 2;
+    banner.innerHTML = `<div class="alert ${stale ? 'a' : 'g'}" style="margin-bottom:14px">
+      <span class="tag">${stale ? 'GAP' : 'LIVE'}</span>
+      <div>${stale ? `Last reading was <b>${since} days ago</b> — log fresh numbers to keep the register accurate.`
+        : `Tracking <b>${plants.filter(p => p.stage !== 'Done').length || '0'}</b> plants · last reading <b>${since === 0 ? 'today' : since + 'd ago'}</b> · stage context <b>${latest.stage}</b>.`}</div></div>`;
+  }
+
+  const active = plants.filter(p => !['Done', 'Curing'].includes(p.stage));
+  let nextH = null;
+  plants.forEach(p => {
+    const pr = plantProgress(p);
+    if (pr && (!nextH || pr.harvest < nextH)) nextH = pr.harvest;
+  });
+  const last7 = logs.slice(0, 7).map(l => l.wtemp).filter(v => v != null);
+  const avgW = last7.length ? (last7.reduce((a, b) => a + b, 0) / last7.length).toFixed(1) : '—';
+  const etaTxt = nextH ? Math.max(0, daysBetween(new Date(), nextH)) + 'd' : '—';
+  document.getElementById('kpis').innerHTML = [
+    ['Active plants', active.length],
+    ['Next harvest', etaTxt],
+    ['Logs', logs.length],
+    ['Avg H₂O 7d', avgW + (avgW !== '—' ? '°' : '')]
+  ].map(([k, v]) => `<div class="kpi"><div class="v">${v}</div><div class="k">${k}</div></div>`).join('');
+
+  const rail = document.getElementById('rail');
+  if (!latest) {
+    rail.innerHTML = '<div class="empty" style="grid-column:1/-1"><b>Awaiting first reading</b>Head to Log and enter today\'s reservoir + climate numbers.</div>';
+  } else {
+    const st = latest.stage;
+    const vpd = calcVPD(latest.atemp, latest.rh);
+    const items = [
+      ['wtemp', latest.wtemp, 'H₂O TEMP'], ['ph', latest.ph, 'PH'], ['ec', latest.ec, 'EC'],
+      ['atemp', latest.atemp, 'AIR TEMP'], ['rh', latest.rh, 'HUMIDITY'], ['vpd', vpd, 'VPD']
+    ];
+    rail.innerHTML = items.map(([key, val, lbl]) => {
+      const s = statusOf(val, key, st);
+      const b = bandFor(key, st);
+      const disp = val == null ? '––' : (key === 'vpd' ? val.toFixed(2) : (key === 'ph' ? val.toFixed(1) : val));
+      const cls = { ok: 'bg-ok', warn: 'bg-warn', bad: 'bg-bad', na: '' }[s];
+      const dcls = { ok: 'd-ok', warn: 'd-warn', bad: 'd-bad', na: 'd-na' }[s];
+      let pos = 8;
+      if (val != null) {
+        const lo = b.ok[0], hi = b.ok[1];
+        pos = Math.max(0, Math.min(66, (val - lo) / (hi - lo) * 66));
+      }
+      return `<div class="readout"><div class="rlabel"><span>${lbl}</span><span class="dotstat ${dcls}"></span></div>
+        <div class="rval ${s === 'na' ? '' : s === 'ok' ? 'ok' : s === 'warn' ? 'warn' : 'bad'}">${disp}<span class="u">${BANDS[key].unit}</span></div>
+        <div class="rtarget">tgt ${b.ideal[0]}–${b.ideal[1]}</div>
+        <div class="zone ${cls}"><i style="left:${pos}%"></i></div></div>`;
+    }).join('');
+  }
+
+  renderAlerts(latest);
+  renderTrend();
+}
+
+function renderAlerts(latest) {
+  const el = document.getElementById('alerts');
+  const A = [];
+  if (latest) {
+    const st = latest.stage, vpd = calcVPD(latest.atemp, latest.rh);
+    if (latest.wtemp != null) {
+      if (latest.wtemp > 70) A.push(['r', 'ROOT ROT', `Reservoir at <b>${latest.wtemp}°F</b> — above the 70°F Pythium threshold. Pull it under 68°F now.`]);
+      else if (latest.wtemp > 68) A.push(['a', 'RES WARM', `Reservoir <b>${latest.wtemp}°F</b> is creeping up. Target 64–68°F.`]);
+      else if (latest.wtemp < 60) A.push(['a', 'RES COLD', `Reservoir <b>${latest.wtemp}°F</b> is cold. Aim for 64–68°F.`]);
+    }
+    if (latest.ph != null) {
+      if (latest.ph < 5.3 || latest.ph > 6.3) A.push(['r', 'PH DRIFT', `pH at <b>${latest.ph}</b> is outside the hydro band — nutrient lockout risk.`]);
+      else if (latest.ph < 5.5 || latest.ph > 6.0) A.push(['a', 'PH EDGE', `pH <b>${latest.ph}</b> is at the edge. Nudge toward 5.8.`]);
+    }
+    if (latest.rh != null && st === 'flower') {
+      if (latest.rh > 55) A.push(['r', 'BOTRYTIS', `Canopy RH <b>${latest.rh}%</b> in flower — bud rot territory. Drop below 50%.`]);
+      else if (latest.rh > 50) A.push(['a', 'RH HIGH', `Flower RH <b>${latest.rh}%</b> is above 40–50% target.`]);
+    }
+    if (latest.ec != null) {
+      const b = bandFor('ec', st);
+      if (latest.ec > b.ok[1]) A.push(['a', 'EC HOT', `EC <b>${latest.ec}</b> exceeds the ${st} ceiling.`]);
+      else if (latest.ec < b.ok[0]) A.push(['a', 'EC LEAN', `EC <b>${latest.ec}</b> is light for ${st}.`]);
+    }
+    if (vpd != null) {
+      const s = statusOf(vpd, 'vpd', st);
+      if (s === 'bad') A.push(['a', 'VPD OFF', `VPD <b>${vpd.toFixed(2)} kPa</b> is outside the ${st} window.`]);
+    }
+    if (latest.root === 'Brown / slimy') A.push(['r', 'ROOT HEALTH', 'Roots logged as brown/slimy — active root rot. Sterilize & drop water temp.']);
+  }
+  if (!A.length) {
+    el.innerHTML = latest ? '<div class="alert g"><span class="tag">CLEAR</span><div>All logged parameters inside target. Keep logging daily.</div></div>'
+      : '<div class="empty"><b>No data to assess</b>Log a reading to activate the risk register.</div>';
+    return;
+  }
+  A.sort((a, b) => (a[0] === 'r' ? 0 : 1) - (b[0] === 'r' ? 0 : 1));
+  el.innerHTML = A.map(([c, t, m]) => `<div class="alert ${c}"><span class="tag">${t}</span><div>${m}</div></div>`).join('');
+}
+
+function renderTrend() {
+  const el = document.getElementById('trendWrap');
+  const data = logs.slice(0, 10).map(l => l.wtemp).filter(v => v != null).reverse();
+  if (data.length < 2) {
+    el.innerHTML = '<h3>Reservoir temp</h3><div class="ts">Log at least 2 readings with water temp to see the trend.</div>';
+    return;
+  }
+  const W = 320, H = 78, pad = 4;
+  const min = Math.min(...data, 62), max = Math.max(...data, 70);
+  const rng = max - min || 1;
+  const step = (W - pad * 2) / (data.length - 1);
+  const pts = data.map((v, i) => [pad + i * step, H - pad - ((v - min) / rng) * (H - pad * 2)]);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+  const y68 = H - pad - ((68 - min) / rng) * (H - pad * 2);
+  const last = data[data.length - 1];
+  const lc = last > 70 ? 'var(--red)' : last > 68 ? 'var(--amber)' : 'var(--green)';
+  el.innerHTML = `<h3 style="color:${lc}">Reservoir temp · now ${last}°F</h3>
+    <div class="ts">Dashed line = 68°F root-rot threshold</div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <line x1="0" y1="${y68.toFixed(1)}" x2="${W}" y2="${y68.toFixed(1)}" stroke="#F4B740" stroke-width="1" stroke-dasharray="4 4" opacity="0.55"/>
+      <path d="${line}" fill="none" stroke="var(--teal)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      ${pts.map(p => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="2.4" fill="var(--teal)"/>`).join('')}
+    </svg>`;
+}
+
+// Firestore listeners
+async function loadProfile() {
+  try {
+    const snap = await getDoc(doc(db, 'rdwc', 'profile'));
+    if (snap.exists()) {
+      profile = snap.data();
+    } else {
+      profile = { ...PROFILE_DEFAULTS };
+    }
+    fillProfile();
+  } catch (e) {
+    console.error('Profile load failed:', e);
+    profile = { ...PROFILE_DEFAULTS };
+    fillProfile();
+  }
+}
+
+function setupPlantListener() {
+  try {
+    const plantsCol = collection(db, 'rdwc', 'plants', 'list');
+    onSnapshot(plantsCol, snap => {
+      plants = snap.docs.map(d => d.data()).sort((a, b) => b.added - a.added);
+      renderPlants();
+      renderDash();
+    }, err => console.error('Plants listener error:', err));
+  } catch (e) {
+    console.error('Plants listener setup failed:', e);
+  }
+}
+
+function setupLogListener() {
+  try {
+    const logsCol = collection(db, 'rdwc', 'logs');
+    const q = query(logsCol, orderBy('ts', 'desc'), limit(100));
+    onSnapshot(q, snap => {
+      logs = snap.docs.map(d => ({ ...d.data(), ts: parseInt(d.id) }));
+      renderLogs();
+      renderDash();
+    }, err => console.error('Logs listener error:', err));
+  } catch (e) {
+    console.error('Logs listener setup failed:', e);
+  }
+}
+
+// Sync indicator
+function updateSyncStatus(status) {
+  const el = document.getElementById('syncStatus');
+  if (status === 'ready') {
+    el.textContent = '● Synced to Firestore';
+    el.style.color = 'var(--green)';
+    syncReady = true;
+  } else if (status === 'connecting') {
+    el.textContent = 'Connecting...';
+    el.style.color = 'var(--muted)';
+  } else {
+    el.textContent = '○ Offline mode';
+    el.style.color = 'var(--amber)';
+  }
+}
+
+// Bootstrap
+(async function init() {
+  updateSyncStatus('connecting');
+  document.getElementById('lg_date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('pl_start').value = new Date().toISOString().slice(0, 10);
+  
+  await loadProfile();
+  setupPlantListener();
+  setupLogListener();
+  
+  setTimeout(() => {
+    if (syncReady) updateSyncStatus('ready');
+    else updateSyncStatus('offline');
+    renderDash();
+  }, 1000);
+})();
+
+// Expose to global for onclick handlers
+window.go = go;
+window.saveProfile = saveProfile;
+window.addPlant = addPlant;
+window.delPlant = delPlant;
+window.addLog = addLog;
+window.delLog = delLog;
+window.toast = toast;
+</script>
+</body>
+</html>
